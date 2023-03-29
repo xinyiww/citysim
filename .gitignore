@@ -1,0 +1,7 @@
+# Ignore .bag files
+*.bag
+*.csv
+
+dataset/
+videos/
+bags/
