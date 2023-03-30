@@ -27,8 +27,8 @@ import matplotlib.patches as patches
 import matplotlib.colors as mcolors
 
 import sys
-sys.path.append("/home/xliu/Documents/ros_record")
-from dataImport import * 
+# sys.path.append("/home/xliu/Documents/ros_record")
+from  bag_from_citysim import *
 np.set_printoptions(precision=4)
 
 VISUALIZE_PATH = 0
@@ -41,7 +41,7 @@ VISUALIZE_LANES = 0
 VISUALIZE_LANES_CENTER = 1
 VISUALIZE_LANES_GRIDWORLD = 0
 VISUALIZE_PREDICTION = 1
-VISUALIZE_GT_AGAINST_PREDICTION = 0
+VISUALIZE_GT_AGAINST_PREDICTION = 1
 LOG_ALL = 0
 EGO_STATE = 0
 
@@ -50,7 +50,8 @@ target_lane_id = 1
 color = 'rgb'
 color_list = ['red', 'green', 'blue','orange','brown', 'pink','yellow', 'purple','aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque']
 
-
+lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
+gt_fn = "dataset/McCulloch@Seminole-01.csv"
 class Visualize_Interface():
     def __init__(self):
 
@@ -76,7 +77,7 @@ class Visualize_Interface():
             raise e
         rospy.loginfo("Done waiting")
         if VISUALIZE_GT_AGAINST_PREDICTION:
-            self.GT = getGTData("/home/xliu/Documents/ros_record/t_jun_pred_idm_af_1_results/gt.csv")
+            self.GT = getGTData(gt_fn)
         try:
             rate = rospy.Rate(20)  # 10hz
             check_id = 0
@@ -88,12 +89,14 @@ class Visualize_Interface():
                 fig1 = plt.figure(1)
                 
                 fig1.clf()
-                ax1 = fig1.add_subplot(211, aspect='equal') 
-                ax2 = fig1.add_subplot(212)
+                ax1 = fig1.add_subplot(111, aspect='equal') 
+                ax1.set_xlim(0,160)
+                ax1.set_ylim(0,100)
+                # ax2 = fig1.add_subplot(212)
                 # ax1.set_xlim([88,102])
-                # ax2.set_xlim([0,10])
-                ax2.set_xlabel("horizon t (s)")
-                ax2.set_ylabel("longitute related prediction (m)")
+                # # ax2.set_xlim([0,10])
+                # ax2.set_xlabel("horizon t (s)")
+                # ax2.set_ylabel("longitute related prediction (m)")
                 
                 
         
@@ -110,8 +113,7 @@ class Visualize_Interface():
                     # for i, lane in enumerate(self.lane_all):
                     #     ax1.plot(lane[0], lane[1], '-'+color[i], label = "lane_"+str(i))
                     # fn = 'RoundaboutALane.npy'
-                    fn = 'McCulloch@SeminoleLanes.npy'
-                    all_lane = np.load(fn, allow_pickle=True)
+                    all_lane = np.load(lane_fn, allow_pickle=True)
                     for i in range(all_lane.shape[0]):
                         xys = all_lane[i].reshape((all_lane[i].shape[0], 2))
                         ax1.plot(xys[:,0], xys[:,1], c = 'grey',
@@ -132,19 +134,8 @@ class Visualize_Interface():
                     for i, lane in enumerate(self.traffic_data.vehicles):
                         for j, veh in enumerate(lane.vehicles):
                             new_veh_ids.append(veh.lifetime_id)
-                            # try:
-                            #     print(abs(lane.vehicles[j].pose.pose.position.y - lane.vehicles[j+1].pose.pose.position.y))
-                            # except:
-                            #     pass
-                    # print(new_veh_ids, check_id, ct)
-                    if (check_id not in new_veh_ids) or ct % 10 == 0:
-                        check_id = np.random.choice(new_veh_ids)
-                        ct = 0
-                    if VISUALIZE_GT_AGAINST_PREDICTION:
-                        data_gt = self.GT[self.GT[:,1] == float(check_id)]
-                        txys_gt = data_gt[:, (0,2,3)]
-                   
-                    
+                            
+          
                             
                     for i, veh in enumerate(self.all_pred_data.predictions):
                         # if veh.agent_id == check_id:
@@ -173,21 +164,19 @@ class Visualize_Interface():
                                 if node_name[:n_pre] == pre:
                                     label_name = node_name[n_pre:]
                             ax1.scatter(np.array(xs), np.array(ys), marker = "*", c = 'blue',alpha=0.1) 
-                            ax1.text(np.array(xs)[-1], np.array(ys)[-1], str(veh.agent_id))
-                            ax2.scatter(np.array(ts)[:n_pred], np.array(ys),label = label_name)
+                            # ax1.text(np.array(xs)[-1], np.array(ys)[-1], str(veh.agent_id))
+                            # ax2.scatter(np.array(ts)[:n_pred], np.array(ys),label = label_name)
 
                         
                             if VISUALIZE_GT_AGAINST_PREDICTION:
                                 # adding gt visualization
-                                
-                                ys_gt = np.interp(ts, txys_gt[:,0], txys_gt[:,2], right = np.nan)
-                                # print(ys_gt, np.any(np.isnan(ys_gt)))
-                                
-                                ax2.scatter(ts, abs(ys_gt - ys_gt[0]), label = "gt")
-                                
-                        
+                                tixys_gt = self.GT[self.GT[:,1] == veh.agent_id]
+                                # ax1.scatter(tixys_gt[:,2], tixys_gt[:,3], marker = "o", c = 'yellow',alpha=0.1)
+                                xs_gt = np.interp(ts, tixys_gt[:,0], tixys_gt[:,2], right = np.nan)
+                                ys_gt = np.interp(ts, tixys_gt[:,0], tixys_gt[:,3], right = np.nan)
+                                ax1.scatter(xs_gt, ys_gt, marker = "o", c = 'yellow',alpha=0.1)
                         ax1.legend()
-                        ax2.legend()
+                        # ax2.legend()
                        
                               
                 if VISUALIZE_TRAFFIC:
@@ -202,12 +191,14 @@ class Visualize_Interface():
                             pos = np.asarray([[veh.pose.pose.position.x-1/2* veh.length*np.cos(yaw), veh.pose.pose.position.y-1/2* veh.length*np.sin(yaw)],
                                                 [veh.pose.pose.position.x+1/2* veh.length*np.cos(yaw), veh.pose.pose.position.y+1/2*veh.length*np.sin(yaw)]])
                             ax1.plot(pos[:,0], pos[:,1],'b', linewidth=7, label = str(veh.lifetime_id)) 
-                            ax1.text(veh.pose.pose.position.x, veh.pose.pose.position.y + 5, veh.lifetime_id )
+                            vx,vy = veh.twist.twist.linear.x, veh.twist.twist.linear.y
+                            ax1.text (veh.pose.pose.position.x, veh.pose.pose.position.y + 5, 
+                                     "id="+str(veh.lifetime_id)+", vel="+ '{:.1f}'.format(np.sqrt(vx**2 + vy**2)))
                             
                             if VISUALIZE_VELOCITY:
                                 arrow_start = (veh.pose.pose.position.x, veh.pose.pose.position.y)
                                 arrow_length = (veh.twist.twist.linear.x, veh.twist.twist.linear.y)
-                                ax1.arrow(*arrow_start, *arrow_length, color='red', width=10)
+                                ax1.arrow(*arrow_start, *arrow_length, color='red', width=1)
                     
                 # ax1.legend()
                 plt.show(block=False)
@@ -267,9 +258,6 @@ class Visualize_Interface():
 
     def route_callback(self,data):
         self.global_route = data
-    
-    
-
 
 def angle_wrap_0_2pi_from_np(angle_radian):
     if angle_radian < 0: 

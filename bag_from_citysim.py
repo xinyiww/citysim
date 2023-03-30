@@ -12,6 +12,43 @@ import pandas as pd
 import rospy
 from math_utils import *
 import rosbag
+from scipy.interpolate import interp1d
+
+
+def getGTData(filename):
+    # Load CSV file into a pandas DataFrame
+    df = pd.read_csv(filename)
+    column_names = ['frameNum', 
+                    'carId', 
+                    'carCenterXft', 
+                    'carCenterYft',
+                    ]
+    for col in column_names:
+        globals()[col] = np.array(df[col].tolist()) 
+    
+    data = np.zeros([len(frameNum), 4])
+            # data[:, 0] = t, veh_id, x, y
+    data[:, 0], data[:, 1], data[:, 2], data[:, 3] = frameNum/30, carId, carCenterXft* 0.3048, carCenterYft* 0.3048
+    return data
+
+
+def calculate_velocity(xs, ys, ts, idx, n_f, n_b):
+    # xs, ys, ts: traj in x, y axis
+    # idx: idx that we want to estimate the velocity
+    # n_f, n_b: data points at front, at back (eg. idx -n_f |____|____| idx + n_f)
+    # Interpolate the data using a quadratic spline
+    tck_x = interp1d(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], 
+                     xs[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], kind='cubic', bounds_error=False, fill_value="extrapolate")
+    tck_y = interp1d(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], 
+                     ys[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], kind='cubic', bounds_error=False, fill_value="extrapolate")
+    
+    # Differentiate the splines to obtain the velocity in the x and y directions
+    vxs = np.gradient(tck_x(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)]), 1/30)
+    vys = np.gradient(tck_y(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)]), 1/30)
+    vx, vy= vxs[min(n_f, idx)], vys[min(n_f, idx)]
+    return vx,vy
+
+
 
 def extract_length_width(p1, p2, p3):
     # Identify the opposite corners of the rectangle
@@ -34,9 +71,6 @@ def write_msg_center_lanes(Ts, laneId, carId, carCenterX, carCenterY):
             mask2 = laneId == l
             ts, xs, ys = Ts[mask1 & mask2], carCenterX[mask1 & mask2], carCenterY[mask1 & mask2]
             
-          
-            
-            
             if l == 4 and ys[-1]-ys[0] < 0:
                 xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(xs)), 
                              np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(ys)))
@@ -58,9 +92,6 @@ def write_msg_center_lanes(Ts, laneId, carId, carCenterX, carCenterY):
         msg_cl.center_lines.append(cl)
 
     return msg_cl
-
-
-#extract_center_lane from averaged trajectories
 def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
     lane_ids = [id for id in np.unique(laneId)]
     for l in lane_ids: 
@@ -88,9 +119,10 @@ def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
         # xs_std, ys_std = np.std(traj_list[:,0,:], axis=0), np.std(traj_list[:,1,:], axis=0)
         # ds_std = np.sqrt(xs_std * xs_std + ys_std * ys_std)
         
+def check_rel_difference(vx,vy, speed):
+    print("calculated speed = ", np.sqrt(vx**2 + vy ** 2), "speed from raw data (m/s)", speed)
 
-
-def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y):
+def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y, speed):
     msg = PerceptionLanes()
     timestamp = rospy.Time(t)
     header = Header()
@@ -115,8 +147,8 @@ def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, bou
                 # we have to calculate an estimated velocity by hand
                 xs, ys, ts = carCenterX[carId == carId[i]], carCenterY[carId == carId[i]], Ts[carId == carId[i]]
                 idx = np.where(ts == t)[0][0]
-                vx, vy = calculate_velocity(xs, ys, ts,idx, 5, 5)
-                # check_rel_difference(vs,vy,speed)
+                vx, vy = calculate_velocity(xs, ys, ts,idx, 8, 8)
+                # check_rel_difference(vx,vy,speed[i])
                 veh.twist.twist.linear.x, veh.twist.twist.linear.y = vx, vy
                 lane_vehs.vehicles.append(veh)
             
@@ -131,14 +163,14 @@ def build_traffic_bag_from_data(data_csv_fn, output_bag_fn):
     # Store all column names in a list
     column_names = ['frameNum', 
                     'carId', 
-                    'carCenterX', 
-                    'carCenterY',
-                    'boundingBox1X', 
-                    'boundingBox1Y',
-                    'boundingBox2X', 
-                    'boundingBox2Y',
-                    'boundingBox3X', 
-                    'boundingBox3Y',
+                    'carCenterXft', 
+                    'carCenterYft',
+                    'boundingBox1Xft', 
+                    'boundingBox1Yft',
+                    'boundingBox2Xft', 
+                    'boundingBox2Yft',
+                    'boundingBox3Xft', 
+                    'boundingBox3Yft',
                     'speed', 
                     'heading',  
                     'laneId']
@@ -154,19 +186,18 @@ def build_traffic_bag_from_data(data_csv_fn, output_bag_fn):
        
     try:
         # visualize_problem(ts, laneId, carId, carCenterX, carCenterY)
-        msg_cl = write_msg_center_lanes(ts, laneId, carId, carCenterX, carCenterY)
+        msg_cl = write_msg_center_lanes(ts, laneId, carId, carCenterXft * 0.3048, carCenterYft * 0.3048)
 
         print("# frames = ", np.unique(ts))
         for t in np.unique(ts):
             # print(ts[ts == t].shape[0])
             indices = np.where(ts == t)[0]
+            # make sure all input are in meters and seconds
+            
             msg_lp = write_msg_lane_perc(t, ts, indices, laneId, carId, 
-                                carCenterX, carCenterY, 
-                                boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y)
-            
+                                carCenterXft * 0.3048, carCenterYft * 0.3048, 
+                                boundingBox1Xft * 0.3048, boundingBox1Yft * 0.3048, boundingBox2Xft * 0.3048, boundingBox2Yft * 0.3048, boundingBox3Xft * 0.3048, boundingBox3Yft * 0.3048, speed* 0.44704)
 
-       
-            
             # bag.write('/region/lanes_center', msg_cl_filtered, rospy.Time(t))
             bag.write('/region/lanes_center', msg_cl, rospy.Time(t))
             bag.write('/region/lanes_perception', msg_lp, rospy.Time(t))
@@ -178,7 +209,7 @@ def build_traffic_bag_from_data(data_csv_fn, output_bag_fn):
 
 if __name__ == "__main__":
     # input_csv_fn = 'RoundaboutA-02.csv'
-    input_csv_fn = "dataset/McCulloch@Seminole-01.csv"
+    input_csv_fn = "bags/McCulloch@Seminole-01.csv"
     output_bag_fn = input_csv_fn[:-4]+".bag"
     build_traffic_bag_from_data(input_csv_fn, output_bag_fn)
         

@@ -9,21 +9,7 @@ from collections import deque
 # from params import 
 from scipy.interpolate import interp1d
 
-def calculate_velocity(xs, ys, ts, idx, n_f, n_b):
-    # xs, ys, ts: traj in x, y axis
-    # idx: idx that we want to estimate the velocity
-    # n_f, n_b: data points at front, at back (eg. idx -n_f |____|____| idx + n_f)
-    # Interpolate the data using a quadratic spline
-    tck_x = interp1d(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], 
-                     xs[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], kind='cubic', bounds_error=False, fill_value="extrapolate")
-    tck_y = interp1d(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], 
-                     ys[max(0, idx - n_f): min(ts.shape[0], idx + n_b)], kind='cubic', bounds_error=False, fill_value="extrapolate")
-    
-    # Differentiate the splines to obtain the velocity in the x and y directions
-    vxs = np.gradient(tck_x(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)]), 1/30)
-    vys = np.gradient(tck_y(ts[max(0, idx - n_f): min(ts.shape[0], idx + n_b)]), 1/30)
-    vx, vy= vxs[min(n_f, idx)], vys[min(n_f, idx)]
-    return vx,vy
+
 
 ########### HERMITE SPLINE 2D ##############
 
