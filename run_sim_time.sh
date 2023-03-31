@@ -1,6 +1,6 @@
 #!/bin/bash
-roscore & 
+# roscore & 
 rosparam set use_sim_time true
-rosbag play -l bags/McCulloch@Seminole-01.bag --clock &
+rosbag play -l -s 30 bags/McCulloch_gt.bag --clock &
 rosrun prediction_ct_vel prediction_ct_vel_node & 
-# python3 rosnode_visualization.py
+python3 rosnode_visualization.py

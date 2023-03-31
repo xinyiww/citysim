@@ -163,7 +163,7 @@ class Visualize_Interface():
                                 n_pre = len(pre)
                                 if node_name[:n_pre] == pre:
                                     label_name = node_name[n_pre:]
-                            ax1.scatter(np.array(xs), np.array(ys), marker = "*", c = 'blue',alpha=0.1) 
+                            ax1.scatter(np.array(xs), np.array(ys), marker = "*", c = 'blue',alpha=0.3) 
                             # ax1.text(np.array(xs)[-1], np.array(ys)[-1], str(veh.agent_id))
                             # ax2.scatter(np.array(ts)[:n_pred], np.array(ys),label = label_name)
 
@@ -174,7 +174,7 @@ class Visualize_Interface():
                                 # ax1.scatter(tixys_gt[:,2], tixys_gt[:,3], marker = "o", c = 'yellow',alpha=0.1)
                                 xs_gt = np.interp(ts, tixys_gt[:,0], tixys_gt[:,2], right = np.nan)
                                 ys_gt = np.interp(ts, tixys_gt[:,0], tixys_gt[:,3], right = np.nan)
-                                ax1.scatter(xs_gt, ys_gt, marker = "o", c = 'yellow',alpha=0.1)
+                                ax1.scatter(xs_gt, ys_gt, marker = "o", c = 'yellow',alpha=0.3)
                         ax1.legend()
                         # ax2.legend()
                        
