@@ -10,10 +10,10 @@ rosparam set use_sim_time true
 # roscore & 
 
 rosrun prediction_ct_vel prediction_ct_vel_node & 
-
+rosrun prediction_GM prediction_GM_node &
 rosbag record -a -O ${BAG_PRED}.bag __name:=my_bag & </dev/null
 
-rosbag play ${BAG_GT}.bag --clock </dev/null
+rosbag play -r 1 ${BAG_GT}.bag --clock </dev/null
 # Kill the ROS nodes and stop recording messages
 rosnode kill my_bag
 # rosnode cleanup

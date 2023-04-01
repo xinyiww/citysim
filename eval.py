@@ -9,7 +9,7 @@ import numpy as np
 from dataImport import *
 import matplotlib.pyplot as plt
 
-def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, RUN_CALCULATION =  True): 
+def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, RUN_CALCULATION =  True, ratio_hrz=1): 
     GT = []
     for i, filename in enumerate(os.listdir(folder_path)):
         file_path = os.path.join(folder_path, filename)
@@ -94,15 +94,15 @@ def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, 
                         running_l2e_pt = 0
                         t_gt = txy_gt[0]
                         pred = data_pred [ data_pred[:,0] <= t_gt]
-                        pred = pred [pred[:,0] >= t_gt - hrz] 
+                        pred = pred [pred[:,0] >= t_gt - hrz*ratio_hrz ] 
                         l2es_temp = []
                         if pred.shape[0] > 0 :
                             for pred_traj in pred:
                                 t_start = pred_traj[0] 
-                                xs = pred_traj[4: 4+1+n_pred]
-                                ys = pred_traj[4+1+n_pred: 4+(1+n_pred)*2]
-                                x_pred = np.interp(t_gt, np.linspace(t_start, t_start + hrz, 1+n_pred), xs)
-                                y_pred = np.interp(t_gt, np.linspace(t_start, t_start + hrz, 1+n_pred), ys)
+                                xs = pred_traj[4: 4+n_pred]
+                                ys = pred_traj[4+n_pred: 4+(n_pred)*2]
+                                x_pred = np.interp(t_gt, np.linspace(t_start, t_start + hrz, n_pred), xs)
+                                y_pred = np.interp(t_gt, np.linspace(t_start, t_start + hrz, n_pred), ys)
                                 l2e = np.sqrt((txy_gt[1] - x_pred) **2 +  (txy_gt[2] - y_pred) **2)
                                 l2es_temp.append(l2e)
                                 preds_all.append(l2e)
@@ -134,8 +134,8 @@ def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, 
                 
                 preds_all_sorted = preds_all[preds_all.argsort()]
                 x = np.linspace(0,1,preds_all_sorted.shape[0])
-                ax.plot(x, preds_all_sorted, '-o', markersize=3,label = filename[:-4])
-                ax.set_xlabel("sorted error index percentile")
+                ax.plot(x, preds_all_sorted, '-o', markersize=3,label = filename[:-4]+", ADE ="+f"{running_l2e_all/ counts_all:.2f}")
+                ax.set_xlabel("sorted ADE index percentile (horizon = "+f"{hrz*ratio_hrz:.2f}"+" sec, #dp/all = "+str(counts_all)+"/"+str(GT.shape[0]*n_pred)+")")
                 ax.legend()
                 
             
@@ -156,7 +156,7 @@ def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, 
     # #         - Calulate a linear interpolation on that GT point
     # #         - store it in order of predicted length in a list, which direct to the GT point
             
-def run_FDE_eval(folder_path, PLOT_ERROR_DIST): 
+def run_FDE_eval(folder_path, PLOT_ERROR_DIST, ratio_hrz=1): 
     GT = []
     for i, filename in enumerate(os.listdir(folder_path)):
         file_path = os.path.join(folder_path, filename)
@@ -170,9 +170,10 @@ def run_FDE_eval(folder_path, PLOT_ERROR_DIST):
     if PLOT_ERROR_DIST:
             fig_error= plt.figure(1)
             ax = fig_error.add_subplot(111)
-            ax.set_xlabel('Sample Index (sorted by error)')
             ax.set_ylabel('Error')
             ax.set_title('Sorted prediction error distribution')
+            
+                
         
     for i, filename in enumerate(os.listdir(folder_path)):
         file_path = os.path.join(folder_path, filename)
@@ -183,7 +184,7 @@ def run_FDE_eval(folder_path, PLOT_ERROR_DIST):
             dt, n_pred = PRED[0,1:3]
             n_pred = int(n_pred)
             hrz = dt * n_pred
-    
+            
 
             running_l2e_all = 0
             counts_all = 0
@@ -200,11 +201,13 @@ def run_FDE_eval(folder_path, PLOT_ERROR_DIST):
                 for pred_traj in data_pred:
                     # linear interp
                     t_start = pred_traj[0]
-                    xf = pred_traj[4+n_pred]
-                    yf = pred_traj[4+(n_pred)*2+1]
-                    if t_start + hrz <= txys_gt[-1,0]:
-                        xf_gt_int = np.interp(t_start + hrz, txys_gt[:,0], txys_gt[:,1])
-                        yf_gt_int = np.interp(t_start + hrz, txys_gt[:,0], txys_gt[:,1])
+                    ind = math.floor(n_pred* ratio_hrz)
+                    # print("ratio= ", ratio_hrz, "index = ", ind)
+                    xf = pred_traj[4 + ind -1]
+                    yf = pred_traj[4 + n_pred +ind -1]
+                    if t_start + hrz * ratio_hrz <= txys_gt[-1,0]:
+                        xf_gt_int = np.interp(t_start + hrz * ratio_hrz, txys_gt[:,0], txys_gt[:,1])
+                        yf_gt_int = np.interp(t_start + hrz * ratio_hrz, txys_gt[:,0], txys_gt[:,1])
                         l2e_pt =  np.sqrt((xf_gt_int - xf) **2 +  (yf_gt_int - yf) **2)
                         running_l2e_pt += l2e_pt
                         counts_veh += 1
@@ -212,45 +215,25 @@ def run_FDE_eval(folder_path, PLOT_ERROR_DIST):
                 running_l2e_all += running_l2e_pt
                 counts_all += counts_veh
                 
-            print("avg ADE for all final points of " + file_path +" =  ",running_l2e_all/ counts_all)
+            print("FDE " + file_path +" =  ",running_l2e_all/ counts_all)
             if PLOT_ERROR_DIST:
                 err = np.array(err)
                 err_sorted= err[err.argsort()]
                 # plt.errorbar(x, preds_pw_mean_std_sorted[:,0], yerr=preds_pw_mean_std_sorted[:,1], fmt='-', capsize=5, markersize=5)
                 x = np.linspace(0,1,err.shape[0])
 
-                ax.plot(x, err_sorted, '-o', markersize=3,label = filename[:-4])
-                ax.set_xlabel("sorted error index percentile")
+                ax.plot(x, err_sorted, '-o', markersize=3,label = filename[:-4]+", FDE ="+f"{running_l2e_all/ counts_all:.2f}")
                 ax.legend()
+                ax.set_xlabel("sorted FDE index percentile (horizon = "+f"{hrz*ratio_hrz:.2f}"+" sec, #dp/all = "+str(counts_all)+"/"+str(PRED.shape[0])+")")
                 
-        plt.show()
+    plt.show()
                        
-            
-        
-                
-            
-    
-    # if PLOT_ERROR_VS_TIME_ELLAPSED:
-    #     fig = plt.figure()
-    #     pred_all_vs_t = np.array(pred_all_vs_t)
-    #     pred_all_vs_t_sorted = pred_all_vs_t[pred_all_vs_t[:,0].argsort()]
-    #     print(pred_all_vs_t_sorted.shape)
-    #     # plt.errorbar(x, preds_pw_mean_std_sorted[:,0], yerr=preds_pw_mean_std_sorted[:,1], fmt='-', capsize=5, markersize=5)
-    #     plt.bar(pred_all_vs_t_sorted[:,0], pred_all_vs_t_sorted[:,1])
-        
-        
-            
-    #     plt.xlabel('Prediction Time elapse')
-    #     plt.ylabel('Prediction Error')
-    #     plt.title('Error vs. Time Ellapsed')
-    #     # plt.legend()
-    #     plt.show()   
 
 
 
 if __name__ == '__main__':
     # result_folder = sys.argv[1]
     result_folder = "bags/McCulloch_pred_results"
-    run_ADE_eval(result_folder, RUN_CALCULATION =  True, PLOT_ONE_TRAJECTORY=False, PLOT_ERROR_DIST=True) 
-    # run_FDE_eval(result_folder, PLOT_ERROR_DIST=True)
+    # run_ADE_eval(result_folder, RUN_CALCULATION =  True, PLOT_ONE_TRAJECTORY=False, PLOT_ERROR_DIST=True, ratio_hrz=0.5) 
+    run_FDE_eval(result_folder, PLOT_ERROR_DIST=True, ratio_hrz=0.5)
     
