@@ -52,26 +52,32 @@ color_list = ['red', 'green', 'blue','orange','brown', 'pink','yellow', 'purple'
 
 lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
 gt_fn = "dataset/McCulloch@Seminole-01.csv"
+pred_topic_name = '/region/all_cars_predictions_GM'
 class Visualize_Interface():
     def __init__(self):
 
         rospy.init_node("Visualize_pred", anonymous=False)
-        rospy.Subscriber('/region/lanes_perception', PerceptionLanes, self.vehicle_callback)
+        if VISUALIZE_TRAFFIC:
+            rospy.Subscriber('/region/lanes_perception', PerceptionLanes, self.vehicle_callback)
         if VISUALIZE_LANES_CENTER: 
             rospy.Subscriber('/region/lanes_center', CenterLanes, self.lane_callback)
         if EGO_STATE: 
             rospy.Subscriber('/region/ego_state', VehicleState, self.ego_callback)
         rospy.Subscriber('/region/global_route', Path, self.route_callback)  # ROUTE PLANNER
         if VISUALIZE_PREDICTION:
-            rospy.Subscriber('/region/all_cars_predictions', PredictionArray, self.all_preds_callback)
+            rospy.Subscriber(pred_topic_name, PredictionArray, self.all_preds_callback)
 
 
         rospy.loginfo("Waiting for traffic...")
         try:
-            if EGO_STATE:   
-                rospy.wait_for_message("/region/ego_state", VehicleState, timeout=10.0)
+            if VISUALIZE_TRAFFIC:
+                rospy.wait_for_message('/region/lanes_perception', PerceptionLanes,timeout=10.0)
+            if VISUALIZE_LANES_CENTER: 
+                rospy.wait_for_message('/region/lanes_center', CenterLanes,timeout=10.0)
+            # if EGO_STATE:   
+            #     rospy.wait_for_message("/region/ego_state", VehicleState, timeout=10.0)
             if VISUALIZE_PREDICTION:
-                rospy.wait_for_message('/region/all_cars_predictions', PredictionArray, timeout=10.0)
+                rospy.wait_for_message(pred_topic_name, PredictionArray, timeout=10.0)
         except rospy.ROSException as e:
             rospy.logerr("Timeout while waiting for traffic info!")
             raise e
@@ -115,7 +121,7 @@ class Visualize_Interface():
                     # fn = 'RoundaboutALane.npy'
                     all_lane = np.load(lane_fn, allow_pickle=True)
                     for i in range(all_lane.shape[0]):
-                        xys = all_lane[i].reshape((all_lane[i].shape[0], 2))
+                        xys = all_lane[i].reshape((all_lane[i].shape[0], 2))* 0.128070 * 0.3048
                         ax1.plot(xys[:,0], xys[:,1], c = 'grey',
                                 alpha = 0.3)
                 

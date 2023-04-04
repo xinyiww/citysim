@@ -1,5 +1,10 @@
 
-import sys, numpy as np
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+
+
 
 # get t, veh_id, pos.x, pos.y
 def getGTData(filename):
@@ -22,7 +27,7 @@ def getGTData(filename):
 def getPredData(filename):
     file = open(filename, 'r')
     dat_str = file.readlines()
-    
+    import matplotlib.pyplot as plt
     sample = dat_str[0].split(' ')
     n_pred= int(sample[2])
     width = 4+4*n_pred
@@ -33,4 +38,7 @@ def getPredData(filename):
         data[i, :] = sample
             
     return data
+
+if __name__ == "__main__":
+    getLaneRaw("/home/xliu/Documents/dataset/CitySim/dataset/McCulloch@SeminoleLanes.npy")
 

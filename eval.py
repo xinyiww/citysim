@@ -6,7 +6,7 @@ import math
 import rospy
 import copy
 import numpy as np
-from dataImport import *
+from unused import *
 import matplotlib.pyplot as plt
 
 def run_ADE_eval(folder_path, PLOT_ERROR_DIST=True, PLOT_ONE_TRAJECTORY = True, RUN_CALCULATION =  True, ratio_hrz=1): 
@@ -233,7 +233,7 @@ def run_FDE_eval(folder_path, PLOT_ERROR_DIST, ratio_hrz=1):
 
 if __name__ == '__main__':
     # result_folder = sys.argv[1]
-    result_folder = "bags/McCulloch_pred_results"
-    # run_ADE_eval(result_folder, RUN_CALCULATION =  True, PLOT_ONE_TRAJECTORY=False, PLOT_ERROR_DIST=True, ratio_hrz=0.5) 
-    run_FDE_eval(result_folder, PLOT_ERROR_DIST=True, ratio_hrz=0.5)
+    result_folder = "bags/McCulloch_pred_use_path_results"
+    run_ADE_eval(result_folder, RUN_CALCULATION =  True, PLOT_ONE_TRAJECTORY=False, PLOT_ERROR_DIST=True, ratio_hrz=1) 
+    run_FDE_eval(result_folder, PLOT_ERROR_DIST=True, ratio_hrz=1)
     

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # define the rosbag we gain GT and generate prediction
-BAG_GT=bags/McCulloch_gt # working space
-BAG_PRED=bags/McCulloch_pred
+BAG_GT=bags/McCulloch_gt_use_path # working space
+BAG_PRED=bags/McCulloch_pred_use_path
 WS=/home/xliu/Documents/dataset/CitySim/
 GT=dataset/McCulloch@Seminole-01.csv
 rosparam set use_sim_time true
