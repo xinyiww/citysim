@@ -41,7 +41,7 @@ VISUALIZE_LANES = 0
 VISUALIZE_LANES_CENTER = 1
 VISUALIZE_LANES_GRIDWORLD = 0
 VISUALIZE_PREDICTION = 1
-VISUALIZE_GT_AGAINST_PREDICTION = 1
+VISUALIZE_GT_AGAINST_PREDICTION = 0
 LOG_ALL = 0
 EGO_STATE = 0
 
@@ -50,7 +50,8 @@ target_lane_id = 1
 color = 'rgb'
 color_list = ['red', 'green', 'blue','orange','brown', 'pink','yellow', 'purple','aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque']
 
-lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
+# lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
+lane_fn = "dataset/county@oviedoLanes.npy"
 gt_fn = "dataset/McCulloch@Seminole-01.csv"
 pred_topic_name = '/region/all_cars_predictions_GM'
 class Visualize_Interface():

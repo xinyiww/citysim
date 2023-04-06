@@ -15,6 +15,7 @@ import rosbag
 from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression
 from scipy.signal import savgol_filter
+from plot_utils import *
 
 # this python file generate ros bags from citysim dataset. It is also called a citysim interface 
 # including the following topics:
@@ -24,7 +25,7 @@ from scipy.signal import savgol_filter
 # scaling:
 #  - unsignalized intesection(dataset/McCulloch@Seminole-01.csv): to_ft: 0.128070 to_meters: to_ft * 0.3048
 #  - RoundaboutA-02 to_ft: 0.213267 to_meters: to_ft * 0.3048
-
+MIN_APPEAR_TIME = 30
 
 def getLaneRaw(lane_fn):
     fig1 = plt.figure(1)
@@ -58,7 +59,7 @@ def getGTData(filename):
     data[:, 0], data[:, 1], data[:, 2], data[:, 3] = frameNum/30, carId, carCenterXft* 0.3048, carCenterYft* 0.3048
     return data
 
-
+# This code is amazing
 def calculate_velocity(xs, ys, ts, idx, n_f, n_b):
     # xs, ys, ts: traj in x, y axis
     # idx: idx that we want to estimate the velocity
@@ -115,58 +116,53 @@ def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = T
         case = cases[path_id]
         cars = [car_id for car_id, lanes in map_car_lanes.items() if lanes == case]
         traj_list = []
+        
         for car_id in cars: 
-            map_car_path[car_id] = path_id
-            # ts = frameNum [carId == car_id] / 30 
-            xs = carCenterXft [carId == car_id]* 0.3048
-            ys = carCenterYft [carId == car_id]* 0.3048
-            ds = np.cumsum(np.sqrt(np.diff(xs,prepend=xs[0])**2 + np.diff(ys,prepend=xs[0])**2))
-            xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), xs), 
-                             np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), ys))
-            traj_list.append([xs_int, ys_int]) 
+            print(len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME)
+            # if len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME:
+            if len(carCenterXft[carId == carId[i]]) <= MIN_APPEAR_TIME:
+                print("car_id = ", car_id)
+            if True:
+                map_car_path[car_id] = path_id
+                xs = carCenterXft [carId == car_id]* 0.3048
+                ys = carCenterYft [carId == car_id]* 0.3048
+                ds = np.cumsum(np.sqrt(np.diff(xs,prepend=xs[0])**2 + np.diff(ys,prepend=xs[0])**2))
+                xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), xs), 
+                                np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), ys))
+                traj_list.append([xs_int, ys_int]) 
         traj_list = np.array(traj_list)
-        xs_avg, ys_avg = np.mean(traj_list[:,0,:], axis=0), np.mean(traj_list[:,1,:], axis=0)
-        xs_sm, ys_sm = savgol_filter(xs_avg, 21, 3),savgol_filter(ys_avg, 21, 3)
-        if visualize_paths:
-            for xys in traj_list:
-                plt.plot(xys[0], xys[1], lw = 1, c='grey')
-            # plt.plot(xs_avg, ys_avg, lw = 5, c='red',  label= 'lane_id ='+str(path_id))
-            plt.plot(xs_sm, ys_sm, lw = 2, c='green',  label= 'lane_id ='+str(path_id))
-            plt.scatter(xs_sm[0], ys_sm[0], s=40,c='blue', label='starting point')
-            # plt.legend()
-            plt.axis("equal")
-            plt.show()
-            
-                
-            # all_lane = np.load("dataset/county@oviedoLanes.npy", allow_pickle=True)
-            
-                
-            # for l in lane_ids: 
-            #     traj_list = []
-            #     xys = all_lane[l].reshape((all_lane[l].shape[0], 2)) * 0.213267 * 0.3048
-                
-            #     plt.plot(xys[:,0], xys[:,1], c = 'grey',
-            #             alpha = 0.3)
-            #     plt.text(xys[0,0], xys[0,1], "lc_"+str(l)) 
-                
+        if traj_list.shape[0] != 0:
+            xs_avg, ys_avg = np.mean(traj_list[:,0,:], axis=0), np.mean(traj_list[:,1,:], axis=0)
+            xs_sm, ys_sm = savgol_filter(xs_avg, 21, 3),savgol_filter(ys_avg, 21, 3)
+            if visualize_paths:
+                for xys in traj_list:
+                    plt.plot(xys[0], xys[1], lw = 1, c='grey')
+                # plt.plot(xs_avg, ys_avg, lw = 5, c='red',  label= 'lane_id ='+str(path_id))
+                plt.plot(xs_sm, ys_sm, lw = 2, c='green',  label= 'lane_id ='+str(path_id))
+                plt.scatter(xs_sm[0], ys_sm[0], s=40,c='blue', label='starting point')
+                # plt.legend()
+                plt.axis("equal")
+                plt.show()
+                    
+        
+            cl = PathWithSpeed()
+            for i in range(xs_sm.shape[0]):
+                pt = PoseStamped()
+                pt.pose.position.x, pt.pose.position.y = xs_sm[i], ys_sm[i]
+                cl.path.poses.append(pt)
     
-        cl = PathWithSpeed()
-        for i in range(xs_sm.shape[0]):
-            pt = PoseStamped()
-            pt.pose.position.x, pt.pose.position.y = xs_sm[i], ys_sm[i]
-            cl.path.poses.append(pt)
- 
-        # fill in msg
-        msg_path.ids.append(path_id)
-        msg_path.center_lines.append(cl)
+            # fill in msg
+            msg_path.ids.append(path_id)
+            msg_path.center_lines.append(cl)
     if visualize_paths:
         plt.show()
     # produce pathId like col laneId 
     pathId = np.array([map_car_path[car_id] for car_id in carId])
     return msg_path, pathId
-    
+
+
 #extract_center_lane from averaged trajectories
-def compute_center_lanes(Ts, laneId, carId, carCenterX, carCenterY):
+def compute_lane_centers(Ts, laneId, carId, carCenterX, carCenterY):
     msg_cl = CenterLanes()
     lane_ids = (id for id in np.unique(laneId))
     for l in lane_ids: 
@@ -198,10 +194,54 @@ def compute_center_lanes(Ts, laneId, carId, carCenterX, carCenterY):
         msg_cl.center_lines.append(cl)
 
     return msg_cl
+
+
+# using 
+def hand_assign_lane_center_interface(npy_fn, scale_pixal_to_meters):
+    msg_cl = CenterLanes()
+    
+    all_lane = np.load(npy_fn, allow_pickle=True)
+    lane_ids = range(all_lane.shape[0])
+    for l in lane_ids:
+        xys = all_lane[l].reshape((all_lane[l].shape[0], 2))* scale_pixal_to_meters
+        plt.plot(xys[:,0], xys[:,1], c = 'grey',
+                alpha = 0.3)
+        # Connect the onclick function to the figure
+        cid = fig.canvas.mpl_connect('button_press_event', lambda event: onclick(event, points))
+        plt.show()
+        points_array = np.array(points)
+        # veh_ids = (id for id in np.unique(carId[laneId == l]))
+        # traj_list = []
+        # for id in veh_ids:
+        #     mask1 = carId == id 
+        #     mask2 = laneId == l
+        #     ts, xs, ys = Ts[mask1 & mask2], carCenterX[mask1 & mask2], carCenterY[mask1 & mask2]
+            
+        #     if l == 4 and ys[-1]-ys[0] < 0:
+        #         xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(xs)), 
+        #                      np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(ys)))
+        #     else:
+        #         xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), xs), 
+        #                      np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), ys))
+        #     traj_list.append([xs_int, ys_int]) 
+        # traj_list = np.array(traj_list)
+        # xs_avg, ys_avg = np.mean(traj_list[:,0,:], axis=0), np.mean(traj_list[:,1,:], axis=0)
+        
+        cl = PathWithSpeed()
+        for i in range(xs_avg.shape[0]):
+            pt = PoseStamped()
+            pt.pose.position.x, pt.pose.position.y = xs_avg[i], ys_avg[i]
+            cl.path.poses.append(pt)
+ 
+        # fill in msg
+        msg_cl.ids.append(l)
+        msg_cl.center_lines.append(cl)
+
+    return msg_cl
+
+
 def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
     lane_ids = [id for id in np.unique(laneId)]
-    
-    
     all_lane = np.load("dataset/McCulloch@SeminoleLanes.npy", allow_pickle=True)
     
         
@@ -239,7 +279,10 @@ def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
 def check_rel_difference(vx,vy, speed):
     print("calculated speed = ", np.sqrt(vx**2 + vy ** 2), "speed from raw data (m/s)", speed)
 
-def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y):
+def write_msg_lane_perc(t,Ts,indices, laneId, carId, 
+                        carCenterX, carCenterY, 
+                        boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y, 
+                        heading, angle_offset):
     msg = PerceptionLanes()
     timestamp = rospy.Time(t)
     header = Header()
@@ -248,6 +291,7 @@ def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, bou
     # ids:
     lane_ids_cur = laneId[indices]
     msg.ids = list(id for id in np.unique(lane_ids_cur))
+   
     # Vehicle information
     for l in msg.ids:
         lane_vehs = VehicleStateArray()
@@ -259,21 +303,24 @@ def write_msg_lane_perc(t,Ts,indices, laneId, carId, carCenterX, carCenterY, bou
                 veh.lifetime_id = carId[i]
                 p1, p2, p3 = (boundingBox1X[i], boundingBox1Y[i]), (boundingBox2X[i], boundingBox2Y[i]), (boundingBox3X[i], boundingBox3Y[i])
                 veh.length, veh.width = extract_length_width(p1, p2, p3)
-                veh.pose.pose.orientation.x, veh.pose.pose.orientation.y, veh.pose.pose.orientation.z, veh.pose.pose.orientation.w = tf.transformations.quaternion_from_euler(0.0, 0.0, heading[i]/180 * np.pi + np.pi/2) 
-                # we have to calculate an estimated velocity by hand
-                xs, ys, ts = carCenterX[carId == carId[i]], carCenterY[carId == carId[i]], Ts[carId == carId[i]]
-                idx = np.where(ts == t)[0][0]
-                xs_sm, ys_sm = savgol_filter(xs, min(21,xs.shape[0]), 3), savgol_filter(ys, min(21,xs.shape[0]), 3)
-                veh.pose.pose.position.x, veh.pose.pose.position.y = xs_sm[idx], ys_sm[idx]
-                vx, vy = calculate_velocity(xs_sm, ys_sm, ts,idx, 8, 8)
-                # check_rel_difference(vx,vy,speed[i])
-                veh.twist.twist.linear.x, veh.twist.twist.linear.y = vx, vy
-                lane_vehs.vehicles.append(veh)
+                
+                veh.pose.pose.orientation.x, veh.pose.pose.orientation.y, veh.pose.pose.orientation.z, veh.pose.pose.orientation.w = tf.transformations.quaternion_from_euler(0.0, 0.0, heading[i]/180 * np.pi + angle_offset) 
+                # validate the trajectory is a true trajectory, that the appearance is longer than 1 sec
+                if len(carCenterX[carId == carId[i]]) >= MIN_APPEAR_TIME:
+                    xs, ys, ts = carCenterX[carId == carId[i]], carCenterY[carId == carId[i]], Ts[carId == carId[i]]
+                    idx = np.where(ts == t)[0][0]
+                    xs_sm, ys_sm = savgol_filter(xs, min(21,xs.shape[0]), 3), savgol_filter(ys, min(21,xs.shape[0]), 3)
+                    # we have to calculate an estimated velocity by hand
+                    veh.pose.pose.position.x, veh.pose.pose.position.y = xs_sm[idx], ys_sm[idx]
+                    vx, vy = calculate_velocity(xs_sm, ys_sm, ts,idx, 8, 8)
+                    # check_rel_difference(vx,vy,speed[i])
+                    veh.twist.twist.linear.x, veh.twist.twist.linear.y = vx, vy
+                    lane_vehs.vehicles.append(veh)
             
         msg.vehicles.append(lane_vehs)
     return  msg
 
-def build_traffic_bag_from_data(data_csv_fn, output_bag_fn):
+def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, output_bag_fn, start_time = 0.0, duration = 50):
     
     # Load CSV file into a pandas DataFrame
     df = pd.read_csv(data_csv_fn)
@@ -304,62 +351,67 @@ def build_traffic_bag_from_data(data_csv_fn, output_bag_fn):
        
     try:
         # visualize_problem(ts, laneId, carId, carCenterXft* 0.3048, carCenterYft* 0.3048)
-        # msg_cl = compute_center_lanes(ts, laneId, carId, carCenterXft * 0.3048, carCenterYft * 0.3048)
-        msg_cl, pathId = compute_paths(carId, carCenterXft, carCenterYft, laneId) # use the smoothed path to replace the lane center
+        msg_cl = hand_assign_lane_center_interface (npy_fn, scale_pixal_to_meters)
         
-        print("# frames = ", np.unique(ts))
+        # msg_cl = compute_lane_centers(ts, laneId, carId, carCenterXft * 0.3048, carCenterYft * 0.3048)
+        # msg_cl, pathId = compute_paths(carId, carCenterXft, carCenterYft, laneId) # use the smoothed path to replace the lane center
+        
+        # heading calibration:
+        angle_offset = calibrate_heading(carCenterXft[carId==0], carCenterYft[carId==0], heading[carId==0])
+        # print("# frames = ", np.unique(ts))
         for t in np.unique(ts):
-            # print(ts[ts == t].shape[0])
-            indices = np.where(ts == t)[0]
-            # make sure all input are in meters and seconds
-            
-            msg_lp = write_msg_lane_perc(t, ts, indices, 
-                                        pathId, #  laneId, # use the smoothed path to replace the lane center
-                                        carId, 
-                                carCenterXft * 0.3048, carCenterYft * 0.3048, 
-                                boundingBox1Xft * 0.3048, boundingBox1Yft * 0.3048, boundingBox2Xft * 0.3048, boundingBox2Yft * 0.3048, boundingBox3Xft * 0.3048, boundingBox3Yft * 0.3048)
+            if t >= start_time:
+                # print(ts[ts == t].shape[0])
+                indices = np.where(ts == t)[0]
+                # make sure all input are in meters and seconds
+                
+                msg_lp = write_msg_lane_perc(t, ts, indices, 
+                                            pathId, #  laneId, # use the smoothed path to replace the lane center
+                                            carId, 
+                                    carCenterXft * 0.3048, carCenterYft * 0.3048, 
+                                    boundingBox1Xft * 0.3048, boundingBox1Yft * 0.3048, boundingBox2Xft * 0.3048, boundingBox2Yft * 0.3048, boundingBox3Xft * 0.3048, boundingBox3Yft * 0.3048, 
+                                    heading, angle_offset)
 
-            # bag.write('/region/lanes_center', msg_cl_filtered, rospy.Time(t))
-            bag.write('/region/lanes_center', msg_cl, rospy.Time(t))
-            bag.write('/region/lanes_perception', msg_lp, rospy.Time(t))
-            print("msg sent at t = ", t)
-            if t >= 50:
-                break      
+                # bag.write('/region/lanes_center', msg_cl_filtered, rospy.Time(t))
+                bag.write('/region/lanes_center', msg_cl, rospy.Time(t))
+                bag.write('/region/lanes_perception', msg_lp, rospy.Time(t))
+                print("msg sent at t = ", t)
+                if t >= (start_time + duration):
+                    break      
     finally:
         bag.close()
         
-        
-# def derive_linear_tf(carCenterX, carCenterXft, carCenterY, carCenterYft):
-#     # this func is to calculate a approx transform from carCenterX --> carCenterXft etc. 
-#     # to be used in function linear_tf
-#     # output x_scale, y_scale, x_offset, y_offset
-#     # nvm I'll use sheet datatool
-#     return x_scale, y_scale, x_offset, y_offset
     
-# def linear_tf(pts, x_scale, y_scale, x_offset, y_offset):
-#     # apply transformation on a set of points stored in numpy array in a shape of (n,2)
-#     xs_tf = pts[:,0] * x_scale + x_offset
-#     ys_tf = pts[:,0] * y_scale + y_offset
-#     return np.array([xs_tf, ys_tf]).T
 
-
-
+def calibrate_heading(xs, ys, hds):
+    dxs, dys = np.diff(xs, append=xs[-1]), np.diff(ys,append=ys[-1])
+    road_dir = np.arctan2(dys, dxs)
+    angle_diff = angle_wrap_0_2pi_from_np(np.mean(road_dir - hds))
     
-    
+    return np.pi/2 * (round(angle_diff/(np.pi/2)))%4
+
+def angle_wrap_0_2pi_from_np(angle_radian):
+    if angle_radian < 0: 
+        return angle_wrap_0_2pi_from_np(angle_radian + np.pi * 2)
+    elif angle_radian >= 2 * np.pi:
+        return angle_wrap_0_2pi_from_np(angle_radian - np.pi * 2)
+    else:
+        return angle_radian    
 
 if __name__ == "__main__":
     # graph representation of lanes
-    # input_csv_fn = "dataset/McCulloch@Seminole-01.csv"
-    # input_npy_fn = "dataset/McCulloch@SeminoleLanes.npy"
+    input_csv_fn = "dataset/McCulloch@Seminole-01.csv"
+    input_npy_fn = "dataset/McCulloch@SeminoleLanes.npy"
     # input_csv_fn = 'dataset/RoundaboutA-02.csv'
     # input_npy_fn = "dataset/county@oviedoLanes.npy" #"dataset/RoundaboutALane.npy"
-    input_csv_fn = "dataset/ExpresswayA-01.csv"
-    input_npy_fn = "dataset/ExpresswayALanes.npy"
+    # input_csv_fn = "dataset/ExpresswayA-01.csv"
+    # input_npy_fn = "dataset/ExpresswayALanes.npy"
     
     # msg_path = compute_paths(input_csv_fn)
     # cases to pass the regions
-
-    output_bag_fn = "bags/ExpresswayA_gt_use_path.bag"
-    build_traffic_bag_from_data(input_csv_fn, output_bag_fn)
+    # output_bag_fn = "bags/RoundaboutA_gt_use_path.bag"
+    output_bag_fn = "bags/McCulloch_gt_use_path.bag"
+    s = 0.128070 * 0.3048
+    build_traffic_bag_from_data(input_csv_fn, input_npy_fn,s, output_bag_fn, duration = 50)
         
     
