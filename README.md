@@ -36,13 +36,13 @@ export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI/carla/dist/carla-0.9.11-py
 Additional path might need adding, listed for reference:
 
 ```
-export PYTHONPATH=$PYTHONPATH:/home/xliu/Documents/carla-setup/catkin_ws/src/carla_setup_src/msgs/ #Adds the path to the Carla ROS message definitions to the PYTHONPATH environment variable.
+export PYTHONPATH=$PYTHONPATH:/path/to/your/carla-setup/catkin_ws/src/carla_setup_src/msgs/ #Adds the path to the Carla ROS message definitions to the PYTHONPATH environment variable.
 
 export UE4_ROOT=/path/to/your/UE4/installation # Sets the UE4_ROOT environment variable to the path where the Unreal Engine is installed.
 
 source /opt/ros/noetic/setup.bash # Sets up the environment for ROS (Robot Operating System).
 
-source /home/xliu/Documents/carla-setup/catkin_ws/devel/setup.bash #Sets up the environment for the Carla ROS bridge.
+source /path/to/your/carla-setup/catkin_ws/devel/setup.bash #Sets up the environment for the Carla ROS bridge.
 
 ```
 
