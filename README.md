@@ -13,6 +13,7 @@
 ## Prerequisites
 - Python 3.8
 - [Carla 0.9.11](https://github.com/honda-research-institute/carla-setup/tree/0.9.11)
+- [prediction_ct_vel]()
 - [ROS Noetic](http://wiki.ros.org/noetic/Installation)
 
 
@@ -46,15 +47,26 @@ source /path/to/your/carla-setup/catkin_ws/devel/setup.bash #Sets up the environ
 
 ```
 
-## Run prediction rosnode (detailed procedure in the prediction_ct_vel module). 
+## Build prediction nodes
+1. Clone the repository and switch to branch  `xinyi`
+```
+git clone https://github.com/honda-research-institute/prediction_ct_vel.git
+git checkout -b xinyi
+```
+
+detailed procedure are listed in the prediction_ct_vel module, but after that, you should be able to run separate nodes by the following command:
+```
+rosrun prediction_ct_vel prediction_ct_vel_node
+```
+
 
 ## Run the interface
  
-
+```
 cd /path/to/CitySim/
 chmod +x run_eval.sh
 chmod +x run_sim_time.sh 
-
+```
 1. For visualizing the dataset: 
 ```
 ./run_sim_time.sh
