@@ -3,11 +3,11 @@
 [Updated: Apr. 11, 2023]
 
 **CitySim-ROS-Interface** is designed to be a plug-in python interface that works with prediction modules developed in prediction_ct_vel repo. Its function includes
-1. Importing Citysim trajectory dataset and transform it to bags.
-2. data visualization
-3. ADE, FDE Evaluation 
+1. Code that imports Citysim trajectory dataset, extract lane center and states of all vehicles and transform it to ROS bags interpretable for predictor rosnodes.
+2. A visualization rosnode that show brid view of traffic in multiple scenarios.  
+3. ADE, FDE Evaluation  
 
-# demo here
+## demo here
 
 
 ## Prerequisites
@@ -48,8 +48,19 @@ source /home/xliu/Documents/carla-setup/catkin_ws/devel/setup.bash #Sets up the 
 
 ## Run prediction rosnode (detailed procedure in the prediction_ct_vel module). 
 
+## Run the interface
+ 
 
-Using script
-run_eval.sh
-run_sim_time.sh 
-revise the filname in the shell script 
+cd /path/to/CitySim/
+chmod +x run_eval.sh
+chmod +x run_sim_time.sh 
+
+1. For visualizing the dataset: 
+```
+./run_sim_time.sh
+```
+2. For running evaluation
+```
+./run_eval.sh
+```
+

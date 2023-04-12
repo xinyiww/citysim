@@ -1,7 +1,7 @@
 #!/bin/bash
 ROSBAG=bags/McCulloch_gt_use_both.bag
 # ROSBAG=bags/RoundaboutA_gt_use_path.bag
-# roscore & 
+roscore & 
 rosparam set use_sim_time true
 rosbag play -l -r 0.2 -s 25 $ROSBAG --clock &
 rosrun prediction_ct_vel prediction_ct_vel_node & 
