@@ -51,28 +51,42 @@ source /path/to/your/carla-setup/catkin_ws/devel/setup.bash #Sets up the environ
 1. Clone the repository and switch to branch  `xinyi`
 ```
 git clone https://github.com/honda-research-institute/prediction_ct_vel.git
-git checkout -b xinyi
+git checkout xinyi
 ```
 
 detailed procedure are listed in the prediction_ct_vel module, but after that, you should be able to run separate nodes by the following command:
 ```
 rosrun prediction_ct_vel prediction_ct_vel_node
 ```
+## Download the dataset from CitySim Dataset
 
+Downloading the up-to-date dataset requires submitting a form to the contributor. Or you could use pre-downloaded version that was stored [here](https://drive.google.com/drive/folders/1q5kUhhvDclF7mSVYR0h6VAvPqJ4G6mVl?usp=share_link) (updated till April 12). 
 
-## Run the interface
- 
+## Transform CitySim data to ROS bags
+Run python file:
+
 ```
 cd /path/to/CitySim/
+python bag_from_citysim.py
+```
+ remember to specify the data csv file with the corresponding lane boundary .npy file in the code.
+
+```
+## Visualizing the dataset: 
+```
 chmod +x run_eval.sh
-chmod +x run_sim_time.sh 
-```
-1. For visualizing the dataset: 
-```
 ./run_sim_time.sh
 ```
-2. For running evaluation
+You should see the anime below. 
+
+
+## Running evaluation
 ```
+chmod +x run_sim_time.sh 
 ./run_eval.sh
 ```
+This will yield 
+- standard ADE, FDE result in the terminal.
+- Error distribution plots for ADE and FDE.
+
 
