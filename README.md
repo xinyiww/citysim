@@ -71,7 +71,7 @@ python bag_from_citysim.py
 ```
  remember to specify the data csv file with the corresponding lane boundary .npy file in the code.
 
-```
+
 ## Visualizing the dataset: 
 ```
 chmod +x run_eval.sh
@@ -86,7 +86,9 @@ chmod +x run_sim_time.sh
 ./run_eval.sh
 ```
 This will yield 
+
 - standard ADE, FDE result in the terminal.
+
 - Error distribution plots for ADE and FDE.
 
 
