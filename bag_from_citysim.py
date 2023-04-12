@@ -25,7 +25,17 @@ from plot_utils import *
 # scaling:
 #  - unsignalized intesection(dataset/McCulloch@Seminole-01.csv): to_ft: 0.128070 to_meters: to_ft * 0.3048
 #  - RoundaboutA-02 to_ft: 0.213267 to_meters: to_ft * 0.3048
+
+# xinyi (updated on Apr 11) lane_id was set to l*MAX_NUM_LANES + i if there are multiple possible paths in one lane section
+
+# the mininum apearance of a car in frames, 30 means a second
 MIN_APPEAR_TIME = 30
+# the transformation from foot to meter
+FT_TO_METER = 0.3048
+# the maximum number of lanes
+# MAX_NUM_LANES = 100
+DEG_TO_RAD = np.pi / 180
+ 
 
 def getLaneRaw(lane_fn):
     fig1 = plt.figure(1)
@@ -56,7 +66,7 @@ def getGTData(filename):
     
     data = np.zeros([len(frameNum), 4])
             # data[:, 0] = t, veh_id, x, y
-    data[:, 0], data[:, 1], data[:, 2], data[:, 3] = frameNum/30, carId, carCenterXft* 0.3048, carCenterYft* 0.3048
+    data[:, 0], data[:, 1], data[:, 2], data[:, 3] = frameNum/30, carId, carCenterXft* FT_TO_METER, carCenterYft* FT_TO_METER
     return data
 
 # This code is amazing
@@ -86,6 +96,46 @@ def extract_length_width(p1, p2, p3):
     # Calculate the width and length of the rectangle
     width, length, _ = np.sort([diag1, diag2, diag3])
     return length, width
+
+# [not used] using hand-assigned lane center
+def hand_assign_lane_center_interface(npy_fn, scale_pixal_to_meters):
+    msg_cl = CenterLanes()
+    all_lane = np.load(npy_fn, allow_pickle=True)
+    lane_ids = range(all_lane.shape[0])
+    for l in lane_ids:
+        xs_avg, ys_avg, is_used = assign_points_interface(npy_fn, l, scale_pixal_to_meters)
+        cl = PathWithSpeed()
+        for i in range(xs_avg.shape[0]):
+            pt = PoseStamped()
+            pt.pose.position.x, pt.pose.position.y = xs_avg[i], ys_avg[i]
+            cl.path.poses.append(pt)
+ 
+        # fill in msg
+        msg_cl.ids.append(l)
+        msg_cl.center_lines.append(cl)
+
+    return msg_cl
+
+def compute_connectivity_representation(carId,laneId):
+    veh_ids_all = np.unique(carId)
+    # lane_ids = np.unique(laneId)
+    lane_ids = np.arange(max(laneId)+1)
+    # init adjacent matrix and map_car_lanes
+    adj_mtr = np.zeros([len(lane_ids), len(lane_ids)])
+    map_car_lanes = {} # car ids -> lanes_passed seq
+    for cid in veh_ids_all:
+        car_in_lanes = laneId[carId == cid]
+        lane_ids_car_v, lane_ids_car_i = np.unique(car_in_lanes, return_index=True)
+        lane_ids_car = lane_ids_car_v[np.argsort(lane_ids_car_i)]
+        map_car_lanes[cid] = tuple(lane_ids_car)
+        for i in range(lane_ids_car.shape[0] -1):
+            adj_mtr[lane_ids_car[i], lane_ids_car[i+1]] = 1
+    return adj_mtr, map_car_lanes
+
+def find_sets_containing_element(lst, element):
+    return [s for s in lst if element in s]
+
+
 
 # compute the graph-theoretic dual representation of the traffic topology via adjacency matrix
 def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = True):
@@ -160,8 +210,87 @@ def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = T
     pathId = np.array([map_car_path[car_id] for car_id in carId])
     return msg_path, pathId
 
+# [not used] use the graph-theoretic dual representation of the traffic topology via adjacency matrix
+def compute_lc_with_paths(carId, carCenterXft, carCenterYft, laneId, 
+                  npy_fn, scale_pixal_to_meters,
+                  visualize_paths = True):
+    veh_ids_all = np.unique(carId)
+    # lane_ids = np.unique(laneId)
+    lane_ids_old = np.arange(max(laneId)+1)
+    _, map_car_lanes =compute_connectivity_representation(carId,laneId)
+    
+    # listed all the cases 
+    cases = list(set(np.array(list(map_car_lanes.values()))))
+    cases = sorted(cases, key=lambda x: ( len(x), x[0],x[len(x)-1])) # starting lane, ending lane, crossing lane
+    
+    msg_cl = CenterLanes()
+    # path_ids = range(len(cases))
+     
+    # build a map from car_id to path_id
+    map_car_path = {}
+    
+    # lane_ids = range(all_lane.shape[0])
+    for l in lane_ids_old:
+        path_ids_with_l = find_sets_containing_element(cases, l)
+        path_trajs_in_l = []
+        # select path taht contains the lane
+        for path_id in path_ids_with_l:
+            case = cases[path_id]
+            cars = [car_id for car_id, lanes in map_car_lanes.items() if lanes == case]
+            traj_list = []
+            for car_id in cars: 
+                # print(len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME)
+                # if len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME:
+                if len(carCenterXft[carId == carId[i]]) <= MIN_APPEAR_TIME:
+                    print("car_id = ", car_id)
+            
+                map_car_path[car_id] = path_id
+                mask1 = carId == id 
+                mask2 = laneId == l
+                xs = carCenterXft [mask1 & mask2]* FT_TO_METER
+                ys = carCenterYft [mask1 & mask2]* FT_TO_METER
+                ds = np.cumsum(np.sqrt(np.diff(xs,prepend=xs[0])**2 + np.diff(ys,prepend=xs[0])**2))
+                xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), xs), 
+                                np.interp(np.linspace(0,1,100), (ds - ds[0])/(ds[-1] - ds[0]), ys))
+                traj_list.append([xs_int, ys_int]) 
+            traj_list = np.array(traj_list)
+            
+            if traj_list.shape[0] != 0:
+                xs_avg, ys_avg = np.mean(traj_list[:,0,:], axis=0), np.mean(traj_list[:,1,:], axis=0)
+                xs_sm, ys_sm = savgol_filter(xs_avg, 21, 3),savgol_filter(ys_avg, 21, 3)
+                path_trajs_in_l.append((xs_sm, ys_sm))
+        
+        xs_avg, ys_avg, hand_assigned_pts_is_used = assign_points_interface(path_trajs_in_l, npy_fn, l, scale_pixal_to_meters)
+        
+ 
+        if hand_assigned_pts_is_used:
+            cl = PathWithSpeed()
+            for i in range(xs_avg.shape[0]):
+                pt = PoseStamped()
+                pt.pose.position.x, pt.pose.position.y = xs_avg[i], ys_avg[i]
+                cl.path.poses.append(pt)
+            # fill in msg
+            msg_cl.ids.append(l)
+            msg_cl.center_lines.append(cl)
+            
+        else:
+            for k, xys in enumerate(path_trajs_in_l):
+                xs, ys = xys[0], xys[1]
+                cl = PathWithSpeed()
+                for i in range(xs_avg.shape[0]):
+                    pt = PoseStamped()
+                    pt.pose.position.x, pt.pose.position.y = xs[i], ys[i]
+                    cl.path.poses.append(pt)
+    
+                # fill in msg
+                msg_cl.ids.append(l*MAX_NUM_LANES + k)
+                
+                msg_cl.center_lines.append(cl)
+    
+    return msg_cl
 
-#extract_center_lane from averaged trajectories
+
+#  Extract_center_lane from averaged trajectories
 def compute_lane_centers(Ts, laneId, carId, carCenterX, carCenterY):
     msg_cl = CenterLanes()
     lane_ids = (id for id in np.unique(laneId))
@@ -196,49 +325,6 @@ def compute_lane_centers(Ts, laneId, carId, carCenterX, carCenterY):
     return msg_cl
 
 
-# using 
-def hand_assign_lane_center_interface(npy_fn, scale_pixal_to_meters):
-    msg_cl = CenterLanes()
-    
-    all_lane = np.load(npy_fn, allow_pickle=True)
-    lane_ids = range(all_lane.shape[0])
-    for l in lane_ids:
-        xys = all_lane[l].reshape((all_lane[l].shape[0], 2))* scale_pixal_to_meters
-        plt.plot(xys[:,0], xys[:,1], c = 'grey',
-                alpha = 0.3)
-        # Connect the onclick function to the figure
-        cid = fig.canvas.mpl_connect('button_press_event', lambda event: onclick(event, points))
-        plt.show()
-        points_array = np.array(points)
-        # veh_ids = (id for id in np.unique(carId[laneId == l]))
-        # traj_list = []
-        # for id in veh_ids:
-        #     mask1 = carId == id 
-        #     mask2 = laneId == l
-        #     ts, xs, ys = Ts[mask1 & mask2], carCenterX[mask1 & mask2], carCenterY[mask1 & mask2]
-            
-        #     if l == 4 and ys[-1]-ys[0] < 0:
-        #         xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(xs)), 
-        #                      np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), np.flip(ys)))
-        #     else:
-        #         xs_int, ys_int = (np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), xs), 
-        #                      np.interp(np.linspace(0,1,100), (ts - ts[0])/(ts[-1] - ts[0]), ys))
-        #     traj_list.append([xs_int, ys_int]) 
-        # traj_list = np.array(traj_list)
-        # xs_avg, ys_avg = np.mean(traj_list[:,0,:], axis=0), np.mean(traj_list[:,1,:], axis=0)
-        
-        cl = PathWithSpeed()
-        for i in range(xs_avg.shape[0]):
-            pt = PoseStamped()
-            pt.pose.position.x, pt.pose.position.y = xs_avg[i], ys_avg[i]
-            cl.path.poses.append(pt)
- 
-        # fill in msg
-        msg_cl.ids.append(l)
-        msg_cl.center_lines.append(cl)
-
-    return msg_cl
-
 
 def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
     lane_ids = [id for id in np.unique(laneId)]
@@ -248,7 +334,7 @@ def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
     for l in lane_ids: 
         traj_list = []
         veh_ids = [id for id in np.unique(carId[laneId == l])]
-        xys = all_lane[l].reshape((all_lane[l].shape[0], 2)) * 0.128070 * 0.3048
+        xys = all_lane[l].reshape((all_lane[l].shape[0], 2)) * 0.128070 * FT_TO_METER
         
         plt.plot(xys[:,0], xys[:,1], c = 'grey',
                 alpha = 0.3)
@@ -350,14 +436,15 @@ def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, outp
     bag = rosbag.Bag(output_bag_fn, 'w')
        
     try:
-        # visualize_problem(ts, laneId, carId, carCenterXft* 0.3048, carCenterYft* 0.3048)
+        # heading calibration:
+        angle_offset = calibrate_heading(carCenterXft[carId==0], carCenterYft[carId==0], heading[carId==0] *DEG_TO_RAD)
+        # visualize_problem(ts, laneId, carId, carCenterXft* FT_TO_METER, carCenterYft* FT_TO_METER)
         msg_cl = hand_assign_lane_center_interface (npy_fn, scale_pixal_to_meters)
         
-        # msg_cl = compute_lane_centers(ts, laneId, carId, carCenterXft * 0.3048, carCenterYft * 0.3048)
-        # msg_cl, pathId = compute_paths(carId, carCenterXft, carCenterYft, laneId) # use the smoothed path to replace the lane center
+        # msg_cl = compute_lane_centers(ts, laneId, carId, carCenterXft * FT_TO_METER, carCenterYft * FT_TO_METER)
+        msg_path, pathId = compute_paths(carId, carCenterXft, carCenterYft, laneId) # use the smoothed path to replace the lane center
         
-        # heading calibration:
-        angle_offset = calibrate_heading(carCenterXft[carId==0], carCenterYft[carId==0], heading[carId==0])
+        
         # print("# frames = ", np.unique(ts))
         for t in np.unique(ts):
             if t >= start_time:
@@ -366,15 +453,21 @@ def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, outp
                 # make sure all input are in meters and seconds
                 
                 msg_lp = write_msg_lane_perc(t, ts, indices, 
-                                            pathId, #  laneId, # use the smoothed path to replace the lane center
+                                            laneId, #  laneId, # use the smoothed path to replace the lane center
                                             carId, 
-                                    carCenterXft * 0.3048, carCenterYft * 0.3048, 
-                                    boundingBox1Xft * 0.3048, boundingBox1Yft * 0.3048, boundingBox2Xft * 0.3048, boundingBox2Yft * 0.3048, boundingBox3Xft * 0.3048, boundingBox3Yft * 0.3048, 
+                                    carCenterXft * FT_TO_METER, carCenterYft * FT_TO_METER, 
+                                    boundingBox1Xft * FT_TO_METER, boundingBox1Yft * FT_TO_METER, boundingBox2Xft * FT_TO_METER, boundingBox2Yft * FT_TO_METER, boundingBox3Xft * FT_TO_METER, boundingBox3Yft * FT_TO_METER, 
                                     heading, angle_offset)
 
+
                 # bag.write('/region/lanes_center', msg_cl_filtered, rospy.Time(t))
+                
+                # bag.write('/region/traffic_avg_paths', msg_lp, rospy.Time(t))
                 bag.write('/region/lanes_center', msg_cl, rospy.Time(t))
+                bag.write('/region/traffic_path', msg_path, rospy.Time(t))
                 bag.write('/region/lanes_perception', msg_lp, rospy.Time(t))
+                # this topic includes avg path 
+                
                 print("msg sent at t = ", t)
                 if t >= (start_time + duration):
                     break      
@@ -385,9 +478,8 @@ def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, outp
 
 def calibrate_heading(xs, ys, hds):
     dxs, dys = np.diff(xs, append=xs[-1]), np.diff(ys,append=ys[-1])
-    road_dir = np.arctan2(dys, dxs)
-    angle_diff = angle_wrap_0_2pi_from_np(np.mean(road_dir - hds))
-    
+    vel_dir = np.arctan2(dys, dxs)
+    angle_diff = angle_wrap_0_2pi_from_np(np.mean(vel_dir - hds))
     return np.pi/2 * (round(angle_diff/(np.pi/2)))%4
 
 def angle_wrap_0_2pi_from_np(angle_radian):
@@ -410,8 +502,8 @@ if __name__ == "__main__":
     # msg_path = compute_paths(input_csv_fn)
     # cases to pass the regions
     # output_bag_fn = "bags/RoundaboutA_gt_use_path.bag"
-    output_bag_fn = "bags/McCulloch_gt_use_path.bag"
-    s = 0.128070 * 0.3048
+    output_bag_fn = "bags/McCulloch_gt_use_both.bag"
+    s = 0.128070 * FT_TO_METER
     build_traffic_bag_from_data(input_csv_fn, input_npy_fn,s, output_bag_fn, duration = 50)
         
     

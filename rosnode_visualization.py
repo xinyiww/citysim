@@ -37,8 +37,9 @@ VISUALIZE_TRAFFIC = 1
 VISUALIZE_VELOCITY = 1
 VISUALIZE_TRAFFIC_GRIDWORLD = 0
 
-VISUALIZE_LANES = 0
+VISUALIZE_LANES = 1
 VISUALIZE_LANES_CENTER = 1
+VISUALIZE_TRAFFIC_PATH = 1
 VISUALIZE_LANES_GRIDWORLD = 0
 VISUALIZE_PREDICTION = 1
 VISUALIZE_GT_AGAINST_PREDICTION = 0
@@ -50,10 +51,10 @@ target_lane_id = 1
 color = 'rgb'
 color_list = ['red', 'green', 'blue','orange','brown', 'pink','yellow', 'purple','aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque']
 
-# lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
-lane_fn = "dataset/county@oviedoLanes.npy"
+lane_fn = "dataset/McCulloch@SeminoleLanes.npy"
+# lane_fn = "dataset/county@oviedoLanes.npy"
 gt_fn = "dataset/McCulloch@Seminole-01.csv"
-pred_topic_name = '/region/all_cars_predictions_GM'
+pred_topic_name = '/region/all_cars_predictions'
 class Visualize_Interface():
     def __init__(self):
 
@@ -62,6 +63,8 @@ class Visualize_Interface():
             rospy.Subscriber('/region/lanes_perception', PerceptionLanes, self.vehicle_callback)
         if VISUALIZE_LANES_CENTER: 
             rospy.Subscriber('/region/lanes_center', CenterLanes, self.lane_callback)
+        if VISUALIZE_TRAFFIC_PATH: 
+            rospy.Subscriber('/region/traffic_path', CenterLanes, self.path_callback)
         if EGO_STATE: 
             rospy.Subscriber('/region/ego_state', VehicleState, self.ego_callback)
         rospy.Subscriber('/region/global_route', Path, self.route_callback)  # ROUTE PLANNER
@@ -75,6 +78,8 @@ class Visualize_Interface():
                 rospy.wait_for_message('/region/lanes_perception', PerceptionLanes,timeout=10.0)
             if VISUALIZE_LANES_CENTER: 
                 rospy.wait_for_message('/region/lanes_center', CenterLanes,timeout=10.0)
+            if VISUALIZE_TRAFFIC_PATH: 
+                rospy.wait_for_message('/region/traffic_path', CenterLanes,timeout=10.0)
             # if EGO_STATE:   
             #     rospy.wait_for_message("/region/ego_state", VehicleState, timeout=10.0)
             if VISUALIZE_PREDICTION:
@@ -99,14 +104,7 @@ class Visualize_Interface():
                 ax1 = fig1.add_subplot(111, aspect='equal') 
                 ax1.set_xlim(0,160)
                 ax1.set_ylim(0,100)
-                # ax2 = fig1.add_subplot(212)
-                # ax1.set_xlim([88,102])
-                # # ax2.set_xlim([0,10])
-                # ax2.set_xlabel("horizon t (s)")
-                # ax2.set_ylabel("longitute related prediction (m)")
                 
-                
-        
 
                 if VISUALIZE_SCENE:
                     
@@ -128,12 +126,20 @@ class Visualize_Interface():
                 
                 if  VISUALIZE_LANES_CENTER:    
                     for i, lane in enumerate(self.lane_all):
-                        ax1.plot(lane[0], lane[1], 
+                        ax1.plot(lane[0], lane[1], c = "black"
                                 #  '-'+color_list[i], 
                                 # label = "lc_"+str(self.lanes_ids[i])
                                 ) 
                         ax1.text(lane[0,0], lane[1,0], "lc_"+str(self.lanes_ids[i]))   
-                        # ax1.legend()    
+                        # ax1.legend() 
+                if  VISUALIZE_TRAFFIC_PATH:    
+                    for i, path in enumerate(self.path_all):
+                        ax1.plot(path[0], path[1], c = "pink",
+                                #  '-'+color_list[i], 
+                                # label = "lc_"+str(self.paths_ids[i])
+                                alpha = 0.2) 
+                        # ax1.text(path[0,0], path[1,0], "p_"+str(self.paths_ids[i]))   
+                        # ax1.legend()      
                 
                 if VISUALIZE_PREDICTION:
                     ct +=1 
@@ -239,6 +245,18 @@ class Visualize_Interface():
                 [l_pose.pose.position.y for l_pose in l.path.poses]
                 ])
             self.lane_all.append(xys)
+            
+    def path_callback(self, data):
+        self.path_data = data
+        self.path_all = []
+        self.paths_ids = self.path_data.ids 
+        for i in range(len(self.path_data.center_lines)):
+            l = self.path_data.center_lines[i]
+            xys = np.array([
+                [l_pose.pose.position.x for l_pose in l.path.poses],
+                [l_pose.pose.position.y for l_pose in l.path.poses]
+                ])
+            self.path_all.append(xys)
             
 
         
