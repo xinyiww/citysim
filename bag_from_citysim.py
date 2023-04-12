@@ -36,7 +36,7 @@ FT_TO_METER = 0.3048
 # MAX_NUM_LANES = 100
 DEG_TO_RAD = np.pi / 180
  
-
+# plot lane boundary
 def getLaneRaw(lane_fn):
     fig1 = plt.figure(1)
                 
@@ -69,7 +69,6 @@ def getGTData(filename):
     data[:, 0], data[:, 1], data[:, 2], data[:, 3] = frameNum/30, carId, carCenterXft* FT_TO_METER, carCenterYft* FT_TO_METER
     return data
 
-# This code is amazing
 def calculate_velocity(xs, ys, ts, idx, n_f, n_b):
     # xs, ys, ts: traj in x, y axis
     # idx: idx that we want to estimate the velocity
@@ -325,7 +324,7 @@ def compute_lane_centers(Ts, laneId, carId, carCenterX, carCenterY):
     return msg_cl
 
 
-
+# used to debug
 def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
     lane_ids = [id for id in np.unique(laneId)]
     all_lane = np.load("dataset/McCulloch@SeminoleLanes.npy", allow_pickle=True)
@@ -365,7 +364,7 @@ def visualize_problem(Ts, laneId, carId, carCenterX, carCenterY):
 def check_rel_difference(vx,vy, speed):
     print("calculated speed = ", np.sqrt(vx**2 + vy ** 2), "speed from raw data (m/s)", speed)
 
-def write_msg_lane_perc(t,Ts,indices, laneId, carId, 
+def write_msg_lane_perc(t,Ts,indices, laneId, pathId, carId, 
                         carCenterX, carCenterY, 
                         boundingBox1X, boundingBox1Y, boundingBox2X, boundingBox2Y, boundingBox3X, boundingBox3Y, 
                         heading, angle_offset):
@@ -387,6 +386,7 @@ def write_msg_lane_perc(t,Ts,indices, laneId, carId,
                 # build a vehicle state instance
                 veh = VehicleState()
                 veh.lifetime_id = carId[i]
+                veh.local_id = pathId[i] # here we use local_id as the path id, so that we could switch to path id
                 p1, p2, p3 = (boundingBox1X[i], boundingBox1Y[i]), (boundingBox2X[i], boundingBox2Y[i]), (boundingBox3X[i], boundingBox3Y[i])
                 veh.length, veh.width = extract_length_width(p1, p2, p3)
                 
@@ -454,6 +454,7 @@ def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, outp
                 
                 msg_lp = write_msg_lane_perc(t, ts, indices, 
                                             laneId, #  laneId, # use the smoothed path to replace the lane center
+                                            pathId,
                                             carId, 
                                     carCenterXft * FT_TO_METER, carCenterYft * FT_TO_METER, 
                                     boundingBox1Xft * FT_TO_METER, boundingBox1Yft * FT_TO_METER, boundingBox2Xft * FT_TO_METER, boundingBox2Yft * FT_TO_METER, boundingBox3Xft * FT_TO_METER, boundingBox3Yft * FT_TO_METER, 
