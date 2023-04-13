@@ -22,7 +22,7 @@ def onclick(event, pts, xys):
             pts.pop()
             # Clear the plot and redraw all the remaining points
             plt.clf()
-            ax.axis('equal')
+            plt.axis('equal')
             plt.plot(xys[:,0], xys[:,1], c = 'grey',
             alpha = 0.3)
 
@@ -42,13 +42,15 @@ def assign_points_interface(npy_fn, id, scale):
     # ax.axis('equal')
     xys = all_lane[id].reshape((all_lane[id].shape[0], 2))* scale
     plt.plot(xys[:,0], xys[:,1], c = 'grey',
-            alpha = 0.3, label = id)
+            alpha = 0.3, label = "lane "+str(id) + " boundaries")
     # for (xs_p, ys_p) in traj_lst:
     #     plt.plot(xs_p, ys_p, c = 'red',
     #         alpha = 0.3)
     plt.scatter(xys[:,0], xys[:,1], color = 'grey',
             alpha = 0.3)
     plt.legend()
+    plt.xlabel("x position (m)")
+    plt.ylabel("y position (m)")
     # Connect the onclick function to the figure
     cid = fig.canvas.mpl_connect('button_press_event', lambda event: onclick(event, points, xys))
 
@@ -70,6 +72,8 @@ def assign_points_interface(npy_fn, id, scale):
         plt.scatter(xs_int, ys_int)
         plt.plot(xys[:,0], xys[:,1], c = 'grey',
                 alpha = 0.3)
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
         plt.axis("equal")
         plt.show()
     else:

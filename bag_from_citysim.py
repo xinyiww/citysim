@@ -96,25 +96,51 @@ def extract_length_width(p1, p2, p3):
     width, length, _ = np.sort([diag1, diag2, diag3])
     return length, width
 
-# [not used] using hand-assigned lane center
-def hand_assign_lane_center_interface(npy_fn, scale_pixal_to_meters):
+# using hand-assigned lane center
+def hand_assign_lane_center_interface(npy_fn, scale_pixal_to_meters, load = True):
     msg_cl = CenterLanes()
     all_lane = np.load(npy_fn, allow_pickle=True)
     lane_ids = range(all_lane.shape[0])
-    for l in lane_ids:
-        xs_avg, ys_avg, is_used = assign_points_interface(npy_fn, l, scale_pixal_to_meters)
-        cl = PathWithSpeed()
-        for i in range(xs_avg.shape[0]):
-            pt = PoseStamped()
-            pt.pose.position.x, pt.pose.position.y = xs_avg[i], ys_avg[i]
-            cl.path.poses.append(pt)
- 
-        # fill in msg
-        msg_cl.ids.append(l)
-        msg_cl.center_lines.append(cl)
+    if not load:
+        with open(npy_fn[:-4]+"_lane_center.npy", 'wb') as f:
+            for l in lane_ids:
+                xs, ys, is_used = assign_points_interface(npy_fn, l, scale_pixal_to_meters)
+                np.save(f, l)
+                np.save(f, xs)
+                np.save(f, ys)  
+                
+                cl = PathWithSpeed()
+                for i in range(xs.shape[0]):
+                    pt = PoseStamped()
+                    pt.pose.position.x, pt.pose.position.y = xs[i], ys[i]
+                    cl.path.poses.append(pt)
+        
+                # fill in msg
+                msg_cl.ids.append(l)
+                msg_cl.center_lines.append(cl)
+                    
+    else: 
+        with open(npy_fn[:-4]+"_lane_center.npy", 'rb') as f:
+            for _ in range(len(lane_ids)):
+                l = np.load(f)
+                xs = np.load(f)
+                ys = np.load(f)
+                
+                cl = PathWithSpeed()
+                for i in range(xs.shape[0]):
+                    pt = PoseStamped()
+                    pt.pose.position.x, pt.pose.position.y = xs[i], ys[i]
+                    cl.path.poses.append(pt)
+        
+                # fill in msg
+                msg_cl.ids.append(l)
+                msg_cl.center_lines.append(cl)
+            
+        
 
     return msg_cl
 
+# adjacent maps of land ids
 def compute_connectivity_representation(carId,laneId):
     veh_ids_all = np.unique(carId)
     # lane_ids = np.unique(laneId)
@@ -136,21 +162,12 @@ def find_sets_containing_element(lst, element):
 
 
 
-# compute the graph-theoretic dual representation of the traffic topology via adjacency matrix
+# let's define path to be a 
 def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = True):
     veh_ids_all = np.unique(carId)
     # lane_ids = np.unique(laneId)
-    lane_ids = np.arange(max(laneId)+1)
-    # init adjacent matrix and map_car_lanes
-    adj_mtr = np.zeros([len(lane_ids), len(lane_ids)])
-    map_car_lanes = {} # car ids -> lanes_passed seq
-    for cid in veh_ids_all:
-        car_in_lanes = laneId[carId == cid]
-        lane_ids_car_v, lane_ids_car_i = np.unique(car_in_lanes, return_index=True)
-        lane_ids_car = lane_ids_car_v[np.argsort(lane_ids_car_i)]
-        map_car_lanes[cid] = tuple(lane_ids_car)
-        for i in range(lane_ids_car.shape[0] -1):
-            adj_mtr[lane_ids_car[i], lane_ids_car[i+1]] = 1
+    lane_ids_old = np.arange(max(laneId)+1)
+    _, map_car_lanes =compute_connectivity_representation(carId,laneId)
     
     cases = list(set(np.array(list(map_car_lanes.values()))))
     cases = sorted(cases, key=lambda x: ( len(x), x[0],x[len(x)-1])) # starting lane, ending lane, crossing lane
@@ -167,9 +184,9 @@ def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = T
         traj_list = []
         
         for car_id in cars: 
-            print(len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME)
+            # print(len(carCenterXft[carId == car_id]) >= MIN_APPEAR_TIME)
             # if len(carCenterXft[carId == carId[i]]) >= MIN_APPEAR_TIME:
-            if len(carCenterXft[carId == carId[i]]) <= MIN_APPEAR_TIME:
+            if len(carCenterXft[carId == car_id]) <= MIN_APPEAR_TIME:
                 print("car_id = ", car_id)
             if True:
                 map_car_path[car_id] = path_id
@@ -187,9 +204,11 @@ def compute_paths(carId, carCenterXft, carCenterYft, laneId, visualize_paths = T
                 for xys in traj_list:
                     plt.plot(xys[0], xys[1], lw = 1, c='grey')
                 # plt.plot(xs_avg, ys_avg, lw = 5, c='red',  label= 'lane_id ='+str(path_id))
-                plt.plot(xs_sm, ys_sm, lw = 2, c='green',  label= 'lane_id ='+str(path_id))
+                plt.plot(xs_sm, ys_sm, lw = 2, c='green',  label= 'avg path of path_id ='+str(path_id))
                 plt.scatter(xs_sm[0], ys_sm[0], s=40,c='blue', label='starting point')
-                # plt.legend()
+                plt.legend()
+                plt.xlabel(" x position (m)")
+                plt.ylabel(" y position (m)")
                 plt.axis("equal")
                 plt.show()
                     
@@ -439,7 +458,7 @@ def build_traffic_bag_from_data(data_csv_fn, npy_fn, scale_pixal_to_meters, outp
         # heading calibration:
         angle_offset = calibrate_heading(carCenterXft[carId==0], carCenterYft[carId==0], heading[carId==0] *DEG_TO_RAD)
         # visualize_problem(ts, laneId, carId, carCenterXft* FT_TO_METER, carCenterYft* FT_TO_METER)
-        msg_cl = hand_assign_lane_center_interface (npy_fn, scale_pixal_to_meters)
+        msg_cl = hand_assign_lane_center_interface (npy_fn, scale_pixal_to_meters) #,load = False)
         
         # msg_cl = compute_lane_centers(ts, laneId, carId, carCenterXft * FT_TO_METER, carCenterYft * FT_TO_METER)
         msg_path, pathId = compute_paths(carId, carCenterXft, carCenterYft, laneId) # use the smoothed path to replace the lane center

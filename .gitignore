@@ -2,6 +2,7 @@
 *.bag
 *.csv
 
-dataset/
+dataset/*.csv
+dataset/*.npy
 videos/
 bags/

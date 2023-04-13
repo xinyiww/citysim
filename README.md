@@ -59,8 +59,13 @@ detailed procedure are listed in the prediction_ct_vel module, but after that, y
 rosrun prediction_ct_vel prediction_ct_vel_node
 ```
 ## Download the dataset from CitySim Dataset
+change directory to `dataset/` and then download the up-to-date dataset requires submitting a form to the contributor. Or you could use pre-downloaded version that was stored [here](https://drive.google.com/drive/folders/1q5kUhhvDclF7mSVYR0h6VAvPqJ4G6mVl?usp=share_link) (updated till April 12). 
+```
+cd dataset
+pip install gdown
+gdown https://drive.google.com/drive/folders/1q5kUhhvDclF7mSVYR0h6VAvPqJ4G6mVl?usp=share_link
+```
 
-Downloading the up-to-date dataset requires submitting a form to the contributor. Or you could use pre-downloaded version that was stored [here](https://drive.google.com/drive/folders/1q5kUhhvDclF7mSVYR0h6VAvPqJ4G6mVl?usp=share_link) (updated till April 12). 
 
 ## Transform CitySim data to ROS bags
 Run python file:
@@ -77,8 +82,9 @@ python bag_from_citysim.py
 chmod +x run_eval.sh
 ./run_sim_time.sh
 ```
-You should see the anime below. 
+You should be able to see the anime below. 
 
+![Demo of the CitySim data interface, using McCulloch unsignalized traffic scenario](demo/demo_draft.gif)
 
 ## Running evaluation
 ```
