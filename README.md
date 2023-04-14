@@ -50,7 +50,7 @@ source /path/to/your/carla-setup/catkin_ws/devel/setup.bash #Sets up the environ
 ## Build prediction nodes
 1. Clone the repository and switch to branch  `xinyi`
 ```
-git clone https://github.com/honda-research-institute/prediction_ct_vel.git
+git clone https://github.com/honda-research-institute/prediction_ct_vel.
 git checkout xinyi
 ```
 
@@ -82,7 +82,7 @@ python bag_from_citysim.py
 chmod +x run_eval.sh
 ./run_sim_time.sh
 ```
-You should be able to see the anime below. 
+This will give you a demo like the following
 
 ![Demo of the CitySim data interface, using McCulloch unsignalized traffic scenario](demo/demo_draft.gif)
 
